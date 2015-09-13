@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+	<title>Learning threejs from scratch</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+
+	<style>
+	  body {
+		margin: 0px;
+		overflow: hidden;
+	  }
+	  #mainview {
+		bottom: 0;
+		left: 0;
+		position: absolute;
+		right: 0;
+		top: 0;
+	  }
+	</style>
+  </head>
+  <body>
+	<!-- HTML element for game view -->
+	<div id="mainview"></div>
+
+	<!-- JS libraries we need for this to work -->
+	<!-- three.js libraries we need -->
+	<script src="js/three.min.js"></script>
+	<!-- Allows us to turn regular three.js display into a split screen -->
+	<script src="js/StereoEffect.js"></script>
+	<!-- Provides three.js the ability to tell where our device is facing and where it moves to -->
+	<script src="js/DeviceOrientationControls.js"></script>
+	<!-- Allows us to control the scene by dragging it around with our mouse or via touch events  -->
+	<script src="js/OrbitControls.js"></script>
+	<!-- Detect if browser has WebGL enabled -->
+	<script src="js/Detector.js"></script>
+	<!-- Stats display -->
+	<script src="js/Stats.js"></script>
+	<!-- Audio support -->
+	<script src="js/howler.js"></script>
+	<!-- Keyboard controls -->
+	<script src="js/THREEx.KeyboardState.js"></script>
+	<!-- Load Fonts -->
+	<script src="fonts/gentilis_bold.typeface.js"></script>
+	<script src="fonts/gentilis_regular.typeface.js"></script>
+	<script src="fonts/optimer_bold.typeface.js"></script>
+	<script src="fonts/optimer_regular.typeface.js"></script>
+	<script src="fonts/helvetiker_bold.typeface.js"></script>
+	<script src="fonts/helvetiker_regular.typeface.js"></script>
+	<script src="fonts/droid_sans_regular.typeface.js"></script>
+	<script src="fonts/droid_sans_bold.typeface.js"></script>
+	<script src="fonts/droid_serif_regular.typeface.js"></script>
+	<script src="fonts/droid_serif_bold.typeface.js"></script>
+
+	<script>
+		if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
+		// Standard global vars
+		var scene,
+			camera, 
+			renderer,
+			element,
+			container,
+			effect,
+			controls,
+			stats;
+		var keyboard = new THREEx.KeyboardState();
+		// Keep track of time between each render
+		var clock = new THREE.Clock();
+		// Text vectors
+		var titleDirection = new THREE.Vector3(0, 0.1, -1);
+		var crawlDirection = new THREE.Vector3(0, 1, -0.5);
+		var titletextMesh = new THREE.Mesh();
+		  
+		init();
+
+		animate();
+
+		function init() {
+			// Main three.js object
+			scene = new THREE.Scene();
+
+			/*
+			* Create Camera
+			* PerspectiveCamera takes following parameters:
+			* 1. fov - vertical field of view for the camera, set to 90 here
+			* 2. aspect - aspect ratio for camera, commonly set to width/height of viewport
+			* 3/4. near/far - any objects between these values are rendered, think of as horizon
+			*/
+			// var SCREEN_WIDTH = 400, SCREEN_HEIGHT = 300;
+			var SCREEN_WIDTH = window.innerWidth, 
+				SCREEN_HEIGHT = window.innerHeight;
+			var VIEW_ANGLE = 90, 
+				ASPECT = SCREEN_WIDTH / SCREEN_HEIGHT, 
+				NEAR = 0.1, 
+				FAR = 800;
+			
+			camera = new THREE.PerspectiveCamera(VIEW_ANGLE, ASPECT, NEAR, FAR);
+			// Set and add camera to scene. Position is x, y, z
+			camera.position.set(0, 0, 0);
+			scene.add(camera);
+			camera.lookAt(scene.position);
+
+			/* 
+			* Renderer
+			* We need an element on the page to draw our game onto, so define rendered and 
+			* assign it to an element with ID of mainview. Three.js has two types of 
+			* renderers - CanvasRenderer (2D canvas context) and WebGLRenderer (WebGL context)
+			*/
+			if ( Detector.webgl )
+			  renderer = new THREE.WebGLRenderer( {antialias:true} );
+			else
+			  renderer = new THREE.CanvasRenderer(); 
+			
+			renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
+
+			element = renderer.domElement;
+			container = document.getElementById('mainview');
+			container.appendChild(element);
+
+			// Pass renderer through stereo effect view (2 eyes)
+			effect = new THREE.StereoEffect(renderer);
+
+			// Stats helper
+			enableStats();
+
+			// Axis helper
+			// axisHelper();
+
+			/*
+			* Camera Controls
+			* Controls for moving the camera around using the mouse or touch events are defined
+			* here. We pass in our camera and the DOM element which we'll be attaching our 
+			* event listeners to. Panning and Zooming are off as is.
+			*/
+			controls = new THREE.OrbitControls(camera, element);
+			// controls.target.set(
+			//   camera.position.x + 0.15,
+			//   camera.position.y,
+			//   camera.position.z
+			// );
+			// controls.noPan = false;
+			// controls.noZoom = false;
+
+			/*
+			* DeviceOrientation
+			* Set up our device event listener that will allow us to track the motion of the 
+			* phone in our Google Cardboard device. This uses the imported JS module from above.
+			*/
+			window.addEventListener('deviceorientation', setOrientationControls, true);
+
+			/*
+			* setOrientationControls
+			* Function to attach to the event listener. The event listener returns three values 
+			* when it has found a compatible device - alpha, beta, and gamma
+			* We check for alpha value at the start of our function to ensure event data is 
+			* coming through as expected
+			*/
+			function setOrientationControls(e) {
+				if (!e.alpha) {
+					return;
+				}
+				// Re-assign controls to phone device orientation control, if present
+				controls = new THREE.DeviceOrientationControls(camera, true);
+				controls.connect();
+				controls.update();
+				// Remove address bar for mobile devices
+				element.addEventListener('click', fullscreen, false);
+				// Remove device orientation listener
+				window.removeEventListener('deviceorientation', setOrientationControls, true);
+			}
+
+			/*
+			* Lighting
+			* Trench Run scene had light coming from NW corner, overshadowed canyon, light on 
+			* right hand wall
+			*/
+			// Kinda at an angle
+			var lightScene = new THREE.PointLight(0xffffff);
+			lightScene.position.set(0, 150, 100);
+			scene.add(lightScene);
+			// More straight down
+			var light = new THREE.PointLight(0x999999, 2, 100);
+			light.position.set(0, 150, 100);
+			scene.add(light);
+
+			/*
+			* Floor Texture
+			* Replace this with trench model
+			*/
+			// Have to use base64 binary for image because I'm serving file locally. Not a problem with Mongoose
+			// var floorTexture = new THREE.ImageUtils.loadTexture( 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAEAAQADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD3+iiigAooooAKKKKACiiigD4AooooAKKKKACiiigAooooA+/6KKKACiiigAooooAKKKKAPgCiiigAooooAKKKKACiiigD7/ooooAKKKKACiiigAooooA+AKKKKACiiigAooooAKKKKAPv+iiigAooooAKKKKACiiigD4AooooAKKKKACiiigAooooA+/6KKKACiiigAooooAKKKKAPgCiiigAooooAKKKKACiiigD7/ooooAKKKKACiiigAooooA+AKKKKACiiigAooooAKKKKAPv+iiigAooooAKKKKACiiigD4AooooAKKKKACiiigAooooA+/6KKKACiiigAooooAKKKKAPgCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooA+/6KKKACiiigAooooAKKKKAPgCiiigAooooAKKKKACiiigD7/ooooAKKKKACiiigAooooA+AKKKKACiiigAooooAKKKKAPv+iiigAooooAKKKKACiiigD4AooooAKKKKACiiigAooooA+/6KKKACiiigAooooAKKKKAPgCiiigAooooAKKKKACiiigD7/ooooAKKKKACiiigAooooA+AKKKKACiiigAooooAKKKKAPv+iiigAooooAKKKKACiiigD4AooooAKKKKACiiigAooooA+/6KKKACiiigAooooAKKKKAPgCiiigAooooAKKKKACiiigD7/ooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKAPgCiiigAooooAKKKKACiiigD7/ooooAKKKKACiiigAooooA+AKKKKACiiigAooooAKKKKAPv+iiigAooooAKKKKACiiigD4AooooAKKKKACiiigAooooA+/6KKKACiiigAooooAKKKKAPgCiiigAooooAKKKKACiiigD7/ooooAKKKKACiiigAooooA+AKKKKACiiigAooooAKKKKAPv+iiigAooooAKKKKACiiigD4AooooAKKKKACiiigAooooA+/6KKKACiiigAooooAKKKKAPgCiiigAooooAKKKKACiiigD7/ooooAKKKKACiiigAooooA+AKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigD7/ooooAKKKKACiiigAooooA+AKKKKACiiigAooooAKKKKAPv+iiigAooooAKKKKACiiigD4AooooAKKKKACiiigAooooA+/6KKKACiiigAooooAKKKKAPgCiiigAooooAKKKKACiiigD7/ooooAKKKKACiiigAooooA+AKKKKACiiigAooooAKKKKAPv+iiigAooooAKKKKACiiigD4AooooAKKKKACiiigAooooA+/6KKKACiiigAooooAKKKKAPgCiiigAooooAKKKKACiiigD7/ooooAKKKKACiiigAooooA+AKKKKACiiigAooooAKKKKAPv+iiigAooooAKKKKACiiigD//2Q==' );
+			// floorTexture.wrapS = THREE.RepeatWrapping;
+			// floorTexture.wrapT = THREE.RepeatWrapping;
+			// // Sets the size of texture
+			// floorTexture.repeat.set( 10, 10 );
+			// // DoubleSide: render texture on both sides of mesh
+			// // Texture types are: (1) Basic (2) Lambert - darker (3) Phong - Smoother looking
+			// var floorMaterial = new THREE.MeshBasicMaterial( { map: floorTexture, side: THREE.DoubleSide } );
+			// // var floorMaterialL = new THREE.MeshLambertMaterial( { map: floorTexture, side: THREE.DoubleSide } );
+			// // var floorMaterialP = new THREE.MeshPhongMaterial( { map: floorTexture, side: THREE.DoubleSide } );
+			// var floorGeometry = new THREE.PlaneGeometry(1000, 1000, 1, 1);
+			// var floor = new THREE.Mesh(floorGeometry, floorMaterial);
+			// floor.position.y = -0.5;
+			// floor.rotation.x = Math.PI / 2;
+			// scene.add(floor);
+
+			/*
+			* Sky Texture
+			* Replace this with stars in space
+			*/
+			var skyBoxGeometry = new THREE.CubeGeometry( 10000, 10000, 10000 );
+			// BackSide: render faces from inside of the cube, instead of from outside (default).
+			var skyBoxMaterial = new THREE.MeshBasicMaterial( { color: 0x9999ff, side: THREE.BackSide } );
+			var skyBox = new THREE.Mesh( skyBoxGeometry, skyBoxMaterial );
+			scene.add(skyBox);
+
+			/*
+			* Light in the sky object/texture
+			*/
+			// var lightbulb = new THREE.Mesh( 
+			// 	new THREE.SphereGeometry( 10, 16, 8 ), 
+			// 	new THREE.MeshBasicMaterial( { color: 0xffaa00 } )
+			// );
+			// scene.add( lightbulb );
+			// lightbulb.position.set(0, 150, 100);
+			// console.log(light.position);
+			// console.log(lightbulb.position);
+			
+			// fog must be added to scene before first render
+			scene.fog = new THREE.FogExp2( 0x9999ff, 0.00025 )
+
+			openingText();
+			
+		}
+
+	  	function openingText() {
+		  	/*
+			* Title Text
+			*/
+			var materialFront = new THREE.MeshBasicMaterial( { color: 0x000000 } );
+			var materialSide = new THREE.MeshBasicMaterial( { color: 0xF4E544 } );
+			var materialArray = [ materialFront, materialSide ];
+			var textGeom = new THREE.TextGeometry( "DOJO WARS", 
+			{
+				size: 30, height: 4, curveSegments: 3,
+				font: "droid sans", weight: "bold", style: "normal",
+				bevelThickness: 1, bevelSize: 3, bevelEnabled: true,
+				material: 0, extrudeMaterial: 1
+			});
+			// font: helvetiker, gentilis, droid sans, droid serif, optimer
+			// weight: normal, bold
+			
+			var textMaterial = new THREE.MeshFaceMaterial(materialArray);
+			titletextMesh = new THREE.Mesh(textGeom, textMaterial );
+			
+			textGeom.computeBoundingBox();
+			var textWidth = textGeom.boundingBox.max.x - textGeom.boundingBox.min.x;
+			
+			titletextMesh.position.set( -0.5 * textWidth, -10, 0 );
+			titletextMesh.rotation.x = 0;
+			scene.add(titletextMesh);
+			playTitleMusic();
+
+			/*
+			* Crawl Text
+			*/
+			var crawlFront = new THREE.MeshBasicMaterial( { color: 0xF4E544 } );
+			var crawltextGeom = new THREE.TextGeometry( "It is a period of civil war. " + 
+				"Rebel ninjas, striking from a " + 
+				"hidden base, have wong their " + 
+				"first victory against the evil " + 
+				"Pirate Empire." + 
+				"" + 
+				"During the battle, rebel spies " + 
+				"managed to steal secret plans " + 
+				"to the Empire’s ultimate weapon, " + 
+				"the DEATH STARRRR, an armored " + 
+				"space station with enough power " + 
+				"to destroy an entire planet." + 
+				"" + 
+				"Analysis of the plans have " + 
+				"revealed a weakness in the " + 
+				"exhaust port system. Though " + 
+				"you must navigate through the " + 
+				"ship’s defenses to deliver the " + 
+				"fatal blow...", 
+			{
+				size: 20, 
+				height: 3, 
+				curveSegments: 1,
+				font: "droid sans", 
+				weight: "normal", 
+				style: "normal",
+				bevelThickness: 1, 
+				bevelSize: 3, 
+				bevelEnabled: false,
+				material: 0, 
+				extrudeMaterial: 1
+			});
+			// font: helvetiker, gentilis, droid sans, droid serif, optimer
+			// weight: normal, bold
+			
+			var crawltextMesh = new THREE.Mesh(crawltextGeom, crawlFront );
+			
+			crawltextGeom.computeBoundingBox();
+			var textWidth = crawltextGeom.boundingBox.max.x - crawltextGeom.boundingBox.min.x;
+			
+			crawltextMesh.position.set( -0.5 * textWidth, 0, 100 );
+			crawltextMesh.rotation.x = -Math.PI / 4;
+			scene.add(crawltextMesh);
+		}
+
+	  	/*
+		* Axis helper
+		*/
+		function axisHelper()
+		{
+			var axes = new THREE.AxisHelper(30);
+			scene.add( axes );
+		}
+
+	  	/*
+		* Stats - display stats
+		*/
+		function enableStats()
+		{
+			stats = new Stats();
+			stats.domElement.style.position = 'absolute';
+			stats.domElement.style.top = '0px';
+			stats.domElement.style.zIndex = 100;
+			container.appendChild( stats.domElement );
+		}
+
+		// Set title music theme and play
+		function playTitleMusic()
+		{
+			var sound = new Howl({
+				urls: ['music/opening-theme.mp3']
+			}).play();
+		}
+
+		/*
+		* Animate function
+		* We want everything to move and refresh on each frame. 
+		*/
+		function animate() {
+			var elapsedSeconds = clock.getElapsedTime();
+			// Add vector to title text to fade away
+			titletextMesh.position.add(titleDirection);
+			// Set animate() to run against next animation frame
+			requestAnimationFrame(animate);
+			// Renders the scene each time
+			render();
+			// Keeps renderer, camera object, and controls matching the browser viewport size
+			update();
+		}
+
+	  function resize() {
+		var width = container.offsetWidth;
+		var height = container.offsetHeight;
+		camera.aspect = width / height;
+		camera.updateProjectionMatrix();
+		renderer.setSize(width, height);
+		effect.setSize(width, height);
+	  }
+	  
+	  function update(dt) {
+	  	var delta = clock.getDelta();
+
+	  	if ( keyboard.pressed("z") ) 
+		{	  
+			// do something
+		}
+		console.log(titletextMesh.position);
+		console.log(clock.getElapsedTime());
+		resize();
+		camera.updateProjectionMatrix();
+		controls.update(dt);
+		stats.update();
+	  }
+
+	  function render(dt) {
+		effect.render(scene, camera);
+	  }
+
+	  function fullscreen() {
+		if (container.requestFullscreen) {
+		  container.requestFullscreen();
+		} else if (container.msRequestFullscreen) {
+		  container.msRequestFullscreen();
+		} else if (container.mozRequestFullScreen) {
+		  container.mozRequestFullScreen();
+		} else if (container.webkitRequestFullscreen) {
+		  container.webkitRequestFullscreen();
+		}
+	  }
+
+	  function getURL(url, callback) {
+		var xmlhttp = new XMLHttpRequest();
+		xmlhttp.onreadystatechange = function() {
+		  if (xmlhttp.readyState == 4) {
+			 if (xmlhttp.status == 200){
+				 callback(JSON.parse(xmlhttp.responseText));
+			 }
+			 else {
+				 console.log('We had an error, status code: ', xmlhttp.status);
+			 }
+		  }
+		}
+		xmlhttp.open('GET', url, true);
+		xmlhttp.send();
+	  }
+	</script>
+
+  </body>
+
+</html>
