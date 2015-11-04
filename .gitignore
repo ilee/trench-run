@@ -36,9 +36,10 @@
 ehthumbs.db
 Thumbs.db
 
-=======
-# Ignore Data Generator project
+# Ignore video, audio, texture files #
+######################################
 /datagen
 /music
 /models
 /StarWarsSoundEffects
+/textures
