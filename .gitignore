@@ -36,10 +36,12 @@
 ehthumbs.db
 Thumbs.db
 
-# Ignore video, audio, texture files #
+# Ignore Video, model, texture files #
 ######################################
 /datagen
 /music
 /models
 /StarWarsSoundEffects
 /textures
+/xx-repos
+/music
