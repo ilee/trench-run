@@ -1,0 +1,14 @@
+{
+  "name": "sockets_multiplayer",
+  "version": "0.0.1",
+  "description": "rogue squadron",
+  "scripts": {
+    "start": "nodemon app.js"
+  },
+  "main": "app.js",
+  "dependencies": {
+    "express": "^4.10.2",
+    "socket.io": "^1.3.5",
+    "three": "^0.71.0"
+  }
+}

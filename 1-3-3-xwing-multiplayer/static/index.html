@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+	<title>Pandemic the Musical</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+
+	<style>
+	  body {
+		margin: 0px;
+		overflow: hidden;
+	  }
+	  #container{
+		top: 0;
+		left: 0;
+		position: absolute;
+		bottom: 0;
+	  }
+	  .sidebar{
+	  	min-height: 90%;
+	  	min-width: 120px;
+	  	max-width: 150px;
+	  	position: absolute;
+	  	top: 5px;
+	  	bottom: 5px;
+	  	right: 0;
+	  	text-align: center;
+	  	/*background-color: #ffffff;*/
+	  	background-image: url(textures/rogue.jpg);
+	  	opacity: 0.7;
+		}
+	  #chatbox{
+	  	height: 85%;
+	  	position: relative;
+	  	overflow-y: scroll;
+
+	  }
+	  #input{
+	  	position: relative;
+	  }
+	</style>
+  </head>
+  <body>
+	<!-- HTML element for Three.js scene -->
+	<div id="container"></div>
+	<div class="sidebar">
+		<h3>Real-Time Chat</h3>
+		<div id="chatbox"></div>
+		<form id='input'>
+			<input type="text" id='message' name='message'>
+        	<input type='submit' value='Submit'>
+		</form>
+	</div>
+
+	<!-- three.js libraries we need -->
+	<script src="js/three.min.js"></script>
+	<!-- Allows us to turn regular three.js display into a split screen -->
+	<script src="js/StereoEffect.js"></script>
+	<!-- Allows us to display CSS 3D elements -->
+	<script src="js/CSS3DStereoRenderer.js"></script>
+	<!-- Allows us to render SVG elements -->
+	<script src="js/SVGRenderer.js"></script>
+	<!-- Load collada model -->
+	<script src="js/ColladaLoader.js"></script>
+	<!-- Provides three.js the ability to tell where our device is facing and where it moves to -->
+	<script src="js/DeviceOrientationControls.js"></script>
+	<!-- Allows us to control the scene by dragging it around with our mouse or via touch events  -->
+	<script src="js/OrbitControls.js"></script>
+	<!-- Detect if browser has WebGL enabled -->
+	<script src="js/Detector.js"></script>
+	<!-- Stats display -->
+	<script src="js/Stats.js"></script>
+	<!-- Audio support -->
+	<script src="js/howler.js"></script>
+	<!-- Keyboard controls -->
+	<script src="js/THREEx.KeyboardState.js"></script>
+
+	<!-- three.js Fonts -->
+	<script src="fonts/gentilis_bold.typeface.js"></script>
+	<script src="fonts/gentilis_regular.typeface.js"></script>
+	<script src="fonts/optimer_bold.typeface.js"></script>
+	<script src="fonts/optimer_regular.typeface.js"></script>
+	<script src="fonts/helvetiker_bold.typeface.js"></script>
+	<script src="fonts/helvetiker_regular.typeface.js"></script>
+	<script src="fonts/droid_sans_regular.typeface.js"></script>
+	<script src="fonts/droid_sans_bold.typeface.js"></script>
+	<script src="fonts/droid_serif_regular.typeface.js"></script>
+	<script src="fonts/droid_serif_bold.typeface.js"></script>
+
+	<!-- jQuery... -->
+	<script src="js/jquery-2.1.4.min.js"></script>
+
+	<!-- Socket and Game Code -->
+	<script src="/socket.io/socket.io.js"></script>
+	<script src='js/game.js'></script>
+	<script>
+		var socket = io();
+
+		// Player functions
+	    socket.on('updatePosition', function(data){
+	        updatePlayerPosition(data);
+	    });
+	    socket.on('connect', function(){
+	        loadWorld();
+	        socket.emit('requestOldPlayers', {});
+	    });
+	    socket.on('createPlayer', function(data){
+	        createPlayer(data);
+	    });
+	    socket.on('addOtherPlayer', function(data){
+	        addOtherPlayer(data);
+	    });
+	    socket.on('removeOtherPlayer', function(data){
+	        removeOtherPlayer(data);
+	    });
+
+	    // Chat functions
+	    $(document).ready(function (){
+	    	var elem = document.getElementById('chatbox');
+		    
+		    socket.on('success', function(data){
+	            var messages = data.messages;
+	            for(var element in messages){
+	                $('#chatbox').append('<p>' + messages[element].message + '</p>');
+	            }   
+	            // Scroll to bottom of chat on new message 
+	            elem.scrollTop = elem.scrollHeight;
+	        })
+
+	    	socket.emit('new:user');
+
+	        $('#input').submit(function(){
+	            console.log($('#message').val());
+	            socket.emit('new:message', {message: $('#message').val() });
+	            $('#message').val('');
+	            // Scroll to bottom of chat on new message 
+	            elem.scrollTop = elem.scrollHeight;
+	            return false;
+	        })
+
+	        socket.on('get:message', function(data){
+	            $('#chatbox').append('<p>' + data.message + '</p>');
+	            // Scroll to bottom of chat on new message 
+	            elem.scrollTop = elem.scrollHeight;
+	        })
+
+	    });
+	</script>
+
+  </body>
+
+</html>
